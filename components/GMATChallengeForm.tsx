@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GMATChallenge } from '@/types/challenge';
 
@@ -8,12 +8,78 @@ interface GMATChallengeFormProps {
   challenge: GMATChallenge;
 }
 
+interface LockoutData {
+  lockoutUntil: number | null;
+  lockoutCount: number;
+}
+
 export default function GMATChallengeForm({ challenge }: GMATChallengeFormProps) {
   const [answers, setAnswers] = useState<string[]>(new Array(challenge.exercises.length).fill(''));
   const [completed, setCompleted] = useState<boolean[]>(new Array(challenge.exercises.length).fill(false));
   const [finalAnswer, setFinalAnswer] = useState('');
   const [finalError, setFinalError] = useState('');
+  const [lockoutData, setLockoutData] = useState<LockoutData>({
+    lockoutUntil: null,
+    lockoutCount: 0,
+  });
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const router = useRouter();
+
+  const LOCKOUT_DURATIONS = [3, 10, 30, 60]; // minutes
+
+  useEffect(() => {
+    // Charger les données de blocage depuis localStorage
+    const stored = localStorage.getItem('gmatChallengeLockout');
+    if (stored) {
+      const data: LockoutData = JSON.parse(stored);
+      setLockoutData(data);
+
+      if (data.lockoutUntil && data.lockoutUntil > Date.now()) {
+        const remaining = Math.ceil((data.lockoutUntil - Date.now()) / 1000);
+        setTimeRemaining(remaining);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    // Timer pour le compte à rebours
+    if (timeRemaining > 0) {
+      const timer = setInterval(() => {
+        setTimeRemaining((prev) => {
+          if (prev <= 1) {
+            // Débloquer
+            const newData = { ...lockoutData, lockoutUntil: null };
+            setLockoutData(newData);
+            localStorage.setItem('gmatChallengeLockout', JSON.stringify(newData));
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [timeRemaining, lockoutData]);
+
+  const getLockoutDuration = (lockoutCount: number): number => {
+    if (lockoutCount < LOCKOUT_DURATIONS.length) {
+      return LOCKOUT_DURATIONS[lockoutCount];
+    }
+    return LOCKOUT_DURATIONS[LOCKOUT_DURATIONS.length - 1];
+  };
+
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
 
   const separators = ['°', "'", '"', 'N', '°', "'", '"', 'E'];
 
@@ -31,19 +97,39 @@ export default function GMATChallengeForm({ challenge }: GMATChallengeFormProps)
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (lockoutData.lockoutUntil && lockoutData.lockoutUntil > Date.now()) {
+      setFinalError('Vous êtes temporairement bloqué. Veuillez attendre.');
+      return;
+    }
+
     const userFinalAnswer = finalAnswer.trim().toLowerCase();
     const correctFinalAnswer = challenge.finalAnswer.toLowerCase();
     const alternativeAnswer = "we've place";
 
     if (userFinalAnswer === correctFinalAnswer || userFinalAnswer === alternativeAnswer) {
+      localStorage.removeItem('gmatChallengeLockout');
       router.push(`/${challenge.nextPath}`);
     } else {
-      setFinalError('Mauvaise réponse. Réessayez !');
+      // Bloquer l'utilisateur après 1 seule tentative
+      const duration = getLockoutDuration(lockoutData.lockoutCount);
+      const lockoutUntil = Date.now() + duration * 60 * 1000;
+      const newLockoutCount = lockoutData.lockoutCount + 1;
+
+      const newData: LockoutData = {
+        lockoutUntil,
+        lockoutCount: newLockoutCount,
+      };
+
+      setLockoutData(newData);
+      localStorage.setItem('gmatChallengeLockout', JSON.stringify(newData));
+      setTimeRemaining(duration * 60);
+      setFinalError(`Mauvaise réponse ! Vous êtes bloqué pendant ${duration} minute${duration > 1 ? 's' : ''}.`);
       setFinalAnswer('');
     }
   };
 
   const allExercisesCompleted = completed.every(c => c);
+  const isLocked = lockoutData.lockoutUntil && lockoutData.lockoutUntil > Date.now();
 
   return (
     <div className="space-y-6">
@@ -54,6 +140,29 @@ export default function GMATChallengeForm({ challenge }: GMATChallengeFormProps)
         <p className="text-lg mb-6 text-white">
           {challenge.description}
         </p>
+
+        <div className="bg-yellow-950 border border-yellow-600 p-4 mb-6">
+          <p className="text-yellow-400 text-center font-bold">
+            ⚠️ ATTENTION : Vous n'avez droit qu'à 1 seul essai pour la question finale !
+          </p>
+          <p className="text-yellow-300 text-center text-sm mt-2">
+            En cas d'erreur, les temps de blocage augmentent progressivement : 3min → 10min → 30min → 60min
+          </p>
+        </div>
+
+        {isLocked && (
+          <div className="bg-red-950 border-2 border-red-500 p-6 mb-6 animate-pulse">
+            <h3 className="text-2xl font-bold text-red-400 mb-2 text-center">
+              ⚠️ ACCÈS BLOQUÉ ⚠️
+            </h3>
+            <p className="text-red-300 text-center text-lg">
+              Temps restant : <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
+            </p>
+            <p className="text-red-400 text-center text-sm mt-2">
+              Vous avez fait une erreur sur la question finale. Veuillez attendre.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-0">
           {challenge.exercises.map((exercise, index) => (
@@ -141,9 +250,14 @@ export default function GMATChallengeForm({ challenge }: GMATChallengeFormProps)
                     setFinalAnswer(e.target.value);
                     setFinalError('');
                   }}
-                  className="w-full px-4 py-2 bg-black border border-green-700 text-green-400 focus:outline-none focus:border-green-500 font-mono"
+                  disabled={!!isLocked}
+                  className={`w-full px-4 py-2 bg-black border font-mono ${
+                    isLocked
+                      ? 'border-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'border-green-700 text-green-400 focus:outline-none focus:border-green-500'
+                  }`}
                   placeholder="Votre réponse finale..."
-                  autoFocus
+                  autoFocus={!isLocked}
                 />
 
                 {finalError && (
@@ -156,7 +270,12 @@ export default function GMATChallengeForm({ challenge }: GMATChallengeFormProps)
 
                 <button
                   type="submit"
-                  className="w-full px-6 py-3 bg-green-900 border border-green-500 text-green-400 hover:bg-green-800 transition-colors font-mono font-bold"
+                  disabled={!!isLocked}
+                  className={`w-full px-6 py-3 border font-mono font-bold transition-colors ${
+                    isLocked
+                      ? 'bg-gray-800 border-gray-700 text-gray-600 cursor-not-allowed'
+                      : 'bg-green-900 border-green-500 text-green-400 hover:bg-green-800'
+                  }`}
                 >
                   VALIDER LA RÉPONSE FINALE
                 </button>
