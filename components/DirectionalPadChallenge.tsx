@@ -180,20 +180,20 @@ export default function DirectionalPadChallenge() {
           )}
 
           <div className="bg-gray-900 border border-green-700 p-6 mb-6">
-            <h3 className="text-xl font-bold text-green-400 mb-4">Indices</h3>
+          <h3 className="text-xl font-bold text-green-400 mb-4">UP DOWN LEFT RIGHT FIND THE DIRECTION</h3>
 
             <div className="space-y-4">
               <div className="bg-black border border-green-600 p-4">
                 <p className="text-green-500 font-bold mb-2">Indice 1:</p>
                 <p className="text-white">
-                  Sunday, J&apos;aimerais bien prendre la direction du programme des little stars de l&apos;hotel de Bangkok.
+                  Sunday in june 2025, J&apos;aimerais bien prendre la direction du programme des little stars de l&apos;hotel de Bangkok.
                 </p>
               </div>
 
               <div className="bg-black border border-green-600 p-4">
                 <p className="text-green-500 font-bold mb-2">Indice 2:</p>
                 <p className="text-white">
-                  Je te conseille d&apos;aller en apprendre plus sur le personnage historique qui indique l&apos;endroit d&apos;où nous sommes partis pour faire la Ha Giang loop.
+                  Je te conseille d&apos;aller voir les discussions wikipedia sur le personnage historique qui a donné son nom à la rue d'où nous avons pris le bus pour faire la Ha Giang loop. (un appel au maitre du jeu est possible pour cette enigme si trop complexe)
                 </p>
               </div>
 

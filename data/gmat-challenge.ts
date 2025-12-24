@@ -3,7 +3,7 @@ import { GMATChallenge } from '@/types/challenge';
 export const gmatChallenge: GMATChallenge = {
   id: 'hec23fr',
   title: 'ESCAPE GAME',
-  description: 'Pour ton plus grand plaisir résoud ces petits exercices type GMAT pour ne pas t\'être entraîné pour rien.',
+  description: 'Pour ton plus grand plaisir résoud ces petits exercices type GMAT pour ne pas t\'être entraîné pour rien. Info : remplace les , par des . ',
   exercises: [
     {
       number: 1,
